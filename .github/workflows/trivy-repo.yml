@@ -15,7 +15,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # Scan du repo (filesystem) + secrets + misconfig
       - name: Trivy FS scan (SARIF)
         uses: aquasecurity/trivy-action@0.24.0
         with:
@@ -26,9 +25,9 @@ jobs:
           output: trivy-repo.sarif
           severity: HIGH,CRITICAL
           ignore-unfixed: true
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          exit-code: "0"
 
       - name: Upload SARIF to GitHub Security
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
-          sarif_file: trivy-repo.sa_
+          sarif_file: trivy-repo.sarif
