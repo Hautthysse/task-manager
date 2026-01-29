@@ -1,0 +1,5 @@
+site_name: Task Manager
+
+theme:
+  name: material
+  language: fr
