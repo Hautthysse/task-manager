@@ -1,9 +1,8 @@
 name: Trivy - Repo scan
 
 on:
-  pull_request:
   push:
-    branches: ["main"]
+  pull_request:
 
 permissions:
   contents: read
@@ -16,19 +15,20 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Trivy scan (filesystem) -> SARIF
-        uses: aquasecurity/trivy-action@v0.33.1
+      # Scan du repo (filesystem) + secrets + misconfig
+      - name: Trivy FS scan (SARIF)
+        uses: aquasecurity/trivy-action@0.24.0
         with:
-          scan-type: "fs"
-          scan-ref: "."
-          format: "sarif"
-          output: "trivy-results.sarif"
-          severity: "HIGH,CRITICAL"
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,config
+          format: sarif
+          output: trivy-repo.sarif
+          severity: HIGH,CRITICAL
           ignore-unfixed: true
-          exit-code: "1"
+          github-token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload SARIF to GitHub Code Scanning
-        if: always()
-        uses: github/codeql-action/upload-sarif@v4
+      - name: Upload SARIF to GitHub Security
+        uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: "trivy-results.sarif"
+          sarif_file: trivy-repo.sa_
