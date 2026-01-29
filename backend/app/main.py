@@ -11,7 +11,8 @@ from .db import Base, engine, get_db
 from .models import Task
 from .schemas import TaskCreate, TaskUpdate, TaskOut
 
-API_KEY = "devsecops-demo-secret-<a_remplacer>"
+# Read the API key from env (no hardcoded secret in code)
+API_KEY = os.environ.get("API_KEY", "")
 
 app = FastAPI(title="Task Manager API", version="1.0.0")
 
@@ -29,6 +30,9 @@ Base.metadata.create_all(bind=engine)
 
 @app.get("/debug")
 def debug():
+    # Disable debug endpoint by default (enable only if explicitly requested)
+    if os.environ.get("ENABLE_DEBUG") != "1":
+        raise HTTPException(status_code=404, detail="Not found")
     return {"env": dict(os.environ)}
 
 
@@ -39,14 +43,15 @@ def health():
 
 @app.get("/admin/stats")
 def admin_stats(x_api_key: str | None = Header(default=None)):
-    if x_api_key != API_KEY:
+    if not API_KEY or x_api_key != API_KEY:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return {"tasks": "…"}
 
 
 @app.post("/import")
 def import_yaml(payload: str = Body(embed=True)):
-    data = yaml.full_load(payload)
+    # Safer YAML parsing (prevents arbitrary object construction)
+    data = yaml.safe_load(payload)
     return {
         "imported": True,
         "keys": list(data.keys()) if isinstance(data, dict) else "n/a",
@@ -62,7 +67,9 @@ def list_tasks(db: Session = Depends(get_db)):
 @app.post("/tasks", response_model=TaskOut, status_code=201)
 def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
     task = Task(
-        title=payload.title.strip(), description=payload.description, status="TODO"
+        title=payload.title.strip(),
+        description=payload.description,
+        status="TODO",
     )
     db.add(task)
     db.commit()
@@ -72,10 +79,9 @@ def create_task(payload: TaskCreate, db: Session = Depends(get_db)):
 
 @app.get("/tasks/search", response_model=list[TaskOut])
 def search_tasks(q: str = Query(""), db: Session = Depends(get_db)):
-    sql = text(
-        f"SELECT * FROM tasks WHERE title LIKE '%{q}%' OR description LIKE '%{q}%'"
-    )
-    rows = db.execute(sql).mappings().all()
+    # Avoid SQL injection: parameterized query
+    sql = text("SELECT * FROM tasks WHERE title LIKE :q OR description LIKE :q")
+    rows = db.execute(sql, {"q": f"%{q}%"}).mappings().all()
     return [Task(**r) for r in rows]
 
 
